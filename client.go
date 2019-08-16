@@ -100,8 +100,6 @@ func (c *Client) get(
 		return fmt.Errorf("datos: unable to create request: %s", err)
 	}
 
-	fmt.Println(makeURL(path, params))
-
 	req.Header.Add("Accept", "application/json")
 	resp, err := c.c.Do(req)
 	if err != nil {
@@ -161,7 +159,7 @@ func (c *Client) Spatials(params Params) ([]Spatial, error) {
 			Items []Spatial `json:"items"`
 		} `json:"result"`
 	}
-	if err := c.get("/catalog/spatials", params, &resp); err != nil {
+	if err := c.get("/catalog/spatial", params, &resp); err != nil {
 		return nil, err
 	}
 
@@ -183,7 +181,7 @@ func (c *Client) Themes(params Params) ([]Theme, error) {
 			Items []Theme `json:"items"`
 		} `json:"result"`
 	}
-	if err := c.get("/catalog/themes", params, &resp); err != nil {
+	if err := c.get("/catalog/theme", params, &resp); err != nil {
 		return nil, err
 	}
 
@@ -199,21 +197,21 @@ type Dataset struct {
 		Text string `json:"text"`
 		Lang string `json:"lang"`
 	} `json:"description"`
-	Distribution       Distribution `json:"distribution"`
-	Identifier         string       `json:"identifier"`
-	Keywords           []string     `json:"keyword"`
-	Language           string       `json:"language"`
-	License            string       `json:"license"`
-	Publisher          string       `json:"publisher"`
-	References         []string     `json:"references"`
-	Spatial            string       `json:"spatial"`
-	Temporal           string       `json:"temporal"`
-	Theme              string       `json:"theme"`
-	Title              Strings      `json:"title"`
-	AccrualPeriodicity string       `json:"accrualPeriodicity"`
-	ConformsTo         string       `json:"conformsTo"`
-	Issued             Datetime     `json:"issued"`
-	Valid              Datetime     `json:"valid"`
+	Distribution       Distributions `json:"distribution"`
+	Identifier         string        `json:"identifier"`
+	Keywords           Strings       `json:"keyword"`
+	Language           string        `json:"language"`
+	License            string        `json:"license"`
+	Publisher          string        `json:"publisher"`
+	References         Strings       `json:"references"`
+	Spatial            Strings       `json:"spatial"`
+	Temporal           string        `json:"temporal"`
+	Theme              Strings       `json:"theme"`
+	Title              Strings       `json:"title"`
+	AccrualPeriodicity string        `json:"accrualPeriodicity"`
+	ConformsTo         string        `json:"conformsTo"`
+	Issued             Datetime      `json:"issued"`
+	Valid              Datetime      `json:"valid"`
 }
 
 type datasetResp struct {
@@ -233,6 +231,7 @@ func (c *Client) Datasets(params Params) ([]Dataset, error) {
 }
 
 // Dataset returns the dataset with the given ID.
+// FIXME: this endpoint doesn't seem to work.
 func (c *Client) Dataset(id string, params Params) (Dataset, error) {
 	var resp datasetResp
 	if err := c.get("/catalog/dataset/"+url.PathEscape(id), params, &resp); err != nil {
@@ -289,7 +288,7 @@ func (c *Client) DatasetsByFormat(format string, params Params) ([]Dataset, erro
 // DatasetsByKeyword returns the datasets with the given keyword.
 func (c *Client) DatasetsByKeyword(keyword string, params Params) ([]Dataset, error) {
 	var resp datasetResp
-	if err := c.get("/catalog/dataset/format/"+url.PathEscape(keyword), params, &resp); err != nil {
+	if err := c.get("/catalog/dataset/keyword/"+url.PathEscape(keyword), params, &resp); err != nil {
 		return nil, err
 	}
 
@@ -388,6 +387,7 @@ func (c *Client) Distributions(params Params) ([]Distribution, error) {
 }
 
 // DistributionsByDataset returns all distributions of a dataset.
+// FIXME: this endpoint doesn't seem to work.
 func (c *Client) DistributionsByDataset(datasetID string, params Params) ([]Distribution, error) {
 	var resp distributionResp
 	if err := c.get(
@@ -415,8 +415,10 @@ func (c *Client) DistributionsByFormat(format string, params Params) ([]Distribu
 	return resp.Result.Items, nil
 }
 
+// Strings is a slice with zero or more strings.
 type Strings []string
 
+// UnmarshalJSON decodes either a single string or a list of them.
 func (s *Strings) UnmarshalJSON(b []byte) error {
 	var val interface{}
 	err := json.Unmarshal(b, &val)
@@ -437,6 +439,33 @@ func (s *Strings) UnmarshalJSON(b []byte) error {
 		}
 	default:
 		return fmt.Errorf("expecting string or string array, got %T", val)
+	}
+
+	return nil
+}
+
+// Distributions is a slice of distributions.
+type Distributions []Distribution
+
+// UnmarshalJSON decodes either a single distribution or a list of them.
+func (s *Distributions) UnmarshalJSON(b []byte) error {
+	switch c := b[0]; c {
+	case '[':
+		var ds []Distribution
+		if err := json.Unmarshal(b, &ds); err != nil {
+			return err
+		}
+
+		*s = append(*s, ds...)
+	case '{':
+		var d Distribution
+		if err := json.Unmarshal(b, &d); err != nil {
+			return err
+		}
+
+		*s = append(*s, d)
+	default:
+		return fmt.Errorf("error decoding distributions, expecting array or object")
 	}
 
 	return nil

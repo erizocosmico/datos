@@ -22,6 +22,10 @@ if err != nil {
 }
 ```
 
+### Known issues
+
+- `Dataset` and `DistributionsByDataset` don't work because the endpoint themselves don't return any data even for the example inputs that should work.
+
 ### License
 
 MIT, see [LICENSE](/LICENSE)
